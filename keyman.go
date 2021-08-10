@@ -58,7 +58,7 @@ func genCountKey(path, key string) string {
 	return path + "-" + key
 }
 
-func genTotleCountKey(path, key string) string {
+func genTotalCountKey(path, key string) string {
 	return path + "-totle-" + key
 }
 
@@ -94,7 +94,7 @@ func (keyman *Keyman) InitHandle(router *gin.Engine) {
 	router.POST("/keymem/addcount", keyman.AddCount)
 	router.POST("/keymem/getcount", keyman.GetCount)
 	router.GET("/keymem/getkeyexpdate", keyman.GetKeyExpdate)
-	router.POST("/keymem/addtotlecount", keyman.AddTotleCount)
+	router.POST("/keymem/addtotalcount", keyman.AddTotalCount)
 }
 
 func (keyman *Keyman) GetPriv(c *gin.Context) (*ecdsa.PrivateKey, error) {
@@ -639,7 +639,7 @@ func (keyman *Keyman) AddCount(c *gin.Context) {
 		return
 	}
 
-	_, err = redisConn.Do("INCRBY", genTotleCountKey(reqpath, key), countInt)
+	_, err = redisConn.Do("INCRBY", genTotalCountKey(reqpath, key), countInt)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "error",
@@ -653,7 +653,7 @@ func (keyman *Keyman) AddCount(c *gin.Context) {
 	})
 }
 
-func (keyman *Keyman) AddTotleCount(c *gin.Context) {
+func (keyman *Keyman) AddTotalCount(c *gin.Context) {
 	priv, err := keyman.GetManPriv(c)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -730,7 +730,7 @@ func (keyman *Keyman) AddTotleCount(c *gin.Context) {
 		return
 	}
 
-	_, err = redisConn.Do("INCRBY", genTotleCountKey(reqpath, key), countInt)
+	_, err = redisConn.Do("INCRBY", genTotalCountKey(reqpath, key), countInt)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "error",
@@ -774,9 +774,9 @@ func (keyman *Keyman) GetCount(c *gin.Context) {
 		return
 	}
 
-	totleNumber, err := redis.Int(redisConn.Do("GET", genTotleCountKey(reqpath, key)))
+	totalNumber, err := redis.Int(redisConn.Do("GET", genTotalCountKey(reqpath, key)))
 	if err == redis.ErrNil {
-		totleNumber = 0
+		totalNumber = 0
 	} else if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "error",
@@ -788,7 +788,7 @@ func (keyman *Keyman) GetCount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ok",
 		"number": number,
-		"totle":  totleNumber,
+		"total":  totalNumber,
 	})
 }
 
