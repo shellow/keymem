@@ -776,7 +776,7 @@ func (keyman *Keyman) GetCount(c *gin.Context) {
 
 	totleNumber, err := redis.Int(redisConn.Do("GET", genTotleCountKey(reqpath, key)))
 	if err == redis.ErrNil {
-		number = 0
+		totleNumber = 0
 	} else if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "error",
