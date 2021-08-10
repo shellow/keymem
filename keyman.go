@@ -998,6 +998,16 @@ func (keyman *Keyman) IsPathKeyValid(c *gin.Context) bool {
 
 	// is key valid
 	key := priv.D.String()
+
+	keyman.CheckKeyOnlytime(key)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return false
+	}
+
 	err = keyman.CheckPathKeyCount(c.Request.URL.Path, key)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -1007,6 +1017,46 @@ func (keyman *Keyman) IsPathKeyValid(c *gin.Context) bool {
 		return false
 	}
 	return true
+}
+
+func (keyman *Keyman) IsPathKeyValidRet(c *gin.Context) (*ecdsa.PrivateKey, bool) {
+	priv, err := keyman.GetPriv(c)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return priv, false
+	}
+	if priv == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "access denied",
+		})
+		return priv, false
+	}
+
+	// is key valid
+	key := priv.D.String()
+
+	keyman.CheckKeyOnlytime(key)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return priv, false
+	}
+
+	err = keyman.CheckPathKeyCount(c.Request.URL.Path, key)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return priv, false
+	}
+	return priv, true
 }
 
 func (keyman *Keyman) GetKeyAddr(c *gin.Context) {
