@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/prometheus/common/log"
+	"github.com/gomodule/redigo/redis"
 	"github.com/shellow/keyman"
 	"github.com/urfave/cli"
 	"go.uber.org/zap"
 	"io/ioutil"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 )
 
 var Logger *zap.SugaredLogger
@@ -50,6 +52,34 @@ func main() {
 			Usage:    "list keys",
 			Category: "manage",
 			Action:   listkey,
+		},
+		{
+			Name:     "addmankey",
+			Usage:    "add manage keys",
+			Category: "manage",
+			Action:   addmemkey,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "raddr",
+					Value: "1",
+					Usage: "redis address",
+				},
+				cli.StringFlag{
+					Name:  "rpass",
+					Value: "1",
+					Usage: "redis password",
+				},
+				cli.StringFlag{
+					Name:  "hkey, hk",
+					Value: "1",
+					Usage: "key for add",
+				},
+				cli.StringFlag{
+					Name:  "hkeyname, kn",
+					Value: "key",
+					Usage: "key name",
+				},
+			},
 		},
 		{
 			Name:     "add",
@@ -173,6 +203,29 @@ func main() {
 			},
 		},
 		{
+			Name:     "addtotlecount",
+			Usage:    "add key path totle count",
+			Category: "manage",
+			Action:   addtotlecount,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "hkey, hk",
+					Value: "1",
+					Usage: "key for add",
+				},
+				cli.StringFlag{
+					Name:  "reqpath",
+					Value: "/test",
+					Usage: "uri path",
+				},
+				cli.IntFlag{
+					Name:  "count",
+					Value: 10,
+					Usage: "quota for use",
+				},
+			},
+		},
+		{
 			Name:     "getcount",
 			Usage:    "get key path count",
 			Category: "manage",
@@ -219,6 +272,30 @@ func listkey(c *cli.Context) error {
 		return err
 	}
 	fmt.Println(string(body))
+	return nil
+}
+
+func addmemkey(c *cli.Context) error {
+	raddr := c.String("raddr")
+	rpass := c.String("rpass")
+	hkey := c.String("hkey")
+	hkeyname := c.String("hkeyname")
+	con, err := redis.Dial("tcp", raddr,
+		redis.DialPassword(rpass),
+		redis.DialDatabase(0),
+		redis.DialConnectTimeout(3*time.Second),
+		redis.DialReadTimeout(3*time.Second),
+		redis.DialWriteTimeout(3*time.Second))
+	if err != nil {
+		return err
+	}
+
+	_, err = con.Do("HSET", "mkeys", hkey, hkeyname)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("ok")
 	return nil
 }
 
@@ -452,6 +529,50 @@ func getownkey(c *cli.Context) error {
 func addcount(c *cli.Context) error {
 	murl := c.GlobalString("surl")
 	murl = murl + "/keymem/addcount"
+
+	key := c.String("hkey")
+	reqpath := c.String("reqpath")
+	count := c.Int("count")
+
+	method := "POST"
+
+	payload := &bytes.Buffer{}
+	writer := multipart.NewWriter(payload)
+	_ = writer.WriteField("key", key)
+	_ = writer.WriteField("reqpath", reqpath)
+	_ = writer.WriteField("count", strconv.Itoa(count))
+	err := writer.Close()
+	if err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, murl, payload)
+
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("key", KEY)
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(body))
+	return nil
+}
+
+func addtotlecount(c *cli.Context) error {
+	murl := c.GlobalString("surl")
+	murl = murl + "/keymem/addtotlecount"
 
 	key := c.String("hkey")
 	reqpath := c.String("reqpath")

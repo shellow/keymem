@@ -58,6 +58,10 @@ func genCountKey(path, key string) string {
 	return path + "-" + key
 }
 
+func genTotleCountKey(path, key string) string {
+	return path + "-totle-" + key
+}
+
 func (keyman *Keyman) keyDelPre(key string) string {
 	return strings.Replace(key, keyman.Keypre, "", 1)
 }
@@ -90,6 +94,7 @@ func (keyman *Keyman) InitHandle(router *gin.Engine) {
 	router.POST("/keymem/addcount", keyman.AddCount)
 	router.POST("/keymem/getcount", keyman.GetCount)
 	router.GET("/keymem/getkeyexpdate", keyman.GetKeyExpdate)
+	router.POST("/keymem/addtotlecount", keyman.AddTotleCount)
 }
 
 func (keyman *Keyman) GetPriv(c *gin.Context) (*ecdsa.PrivateKey, error) {
@@ -634,6 +639,106 @@ func (keyman *Keyman) AddCount(c *gin.Context) {
 		return
 	}
 
+	_, err = redisConn.Do("INCRBY", genTotleCountKey(reqpath, key), countInt)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "ok",
+	})
+}
+
+func (keyman *Keyman) AddTotleCount(c *gin.Context) {
+	priv, err := keyman.GetManPriv(c)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+	if priv == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "access denied",
+		})
+		return
+	}
+
+	key := c.Request.FormValue("key")
+	if strings.EqualFold("", key) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "require key",
+		})
+		return
+	}
+
+	reqpath := c.Request.FormValue("reqpath")
+	if strings.EqualFold("", reqpath) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "require reqpath",
+		})
+		return
+	}
+
+	count := c.Request.FormValue("count")
+	if strings.EqualFold("", count) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "require count",
+		})
+		return
+	}
+
+	countInt, err := strconv.Atoi(count)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "count error",
+		})
+		return
+	}
+
+	redisConn := keyman.RedisPool.Get()
+	defer redisConn.Close()
+	isExist, err := redis.Int(redisConn.Do("HEXISTS", "keys", keyman.keyAddPre(key)))
+	if err == redis.ErrNil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "key not exist",
+		})
+		return
+	} else if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+	if isExist == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": "key not exist",
+		})
+		return
+	}
+
+	_, err = redisConn.Do("INCRBY", genTotleCountKey(reqpath, key), countInt)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ok",
 	})
@@ -669,9 +774,21 @@ func (keyman *Keyman) GetCount(c *gin.Context) {
 		return
 	}
 
+	totleNumber, err := redis.Int(redisConn.Do("GET", genTotleCountKey(reqpath, key)))
+	if err == redis.ErrNil {
+		number = 0
+	} else if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ok",
 		"number": number,
+		"totle":  totleNumber,
 	})
 }
 
